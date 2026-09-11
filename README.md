@@ -29,3 +29,12 @@ Repository → Settings → Secrets and variables → Actions → New repository
 - `APP_STORE_CONNECT_API_KEY_BASE64` — file `AuthKey_XXXXXXXXXX.p8` codificato Base64
 
 Il Bundle ID deve corrispondere esattamente al provisioning profile e all'app registrata in App Store Connect. Apple richiede un Apple Developer Program per distribuire l'app; il workflow usa un runner macOS e il certificato/provisioning profile per la firma. Dopo l'upload, il build appare in App Store Connect e può essere distribuito tramite TestFlight o sottoposto all'App Store.
+
+## Versione Windows
+
+Il workflow `.github/workflows/build-windows.yml` compila automaticamente la versione Windows e crea:
+
+- `Gestione-Preventivi-Setup.exe`: installer professionale Inno Setup, con collegamento nel menu Start e sul desktop.
+- `Gestione-Preventivi-Windows-Portable`: versione portatile della cartella `Release`.
+
+Le notifiche mensili sono disattivate su Windows. Il database SQLite usa `sqflite_common_ffi` sulla piattaforma Windows.
