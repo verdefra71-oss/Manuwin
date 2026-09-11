@@ -1278,6 +1278,7 @@ class _CreaFatturaScreenState extends State<CreaFatturaScreen> {
 
   Future<void> _precompila() async {
     _numero.text = await DatabaseHelper.instance.prossimoNumeroFattura();
+    _iban.clear();
     final p = widget.preventivo;
     if (p != null) {
       cliente = (p['cliente'] ?? '').toString();
@@ -1569,7 +1570,7 @@ class _CreaFatturaScreenState extends State<CreaFatturaScreen> {
                       keyboardType: TextInputType.text,
                       decoration: const InputDecoration(
                         labelText: 'IBAN',
-                        hintText: 'Inserisci IBAN',
+                        hintText: 'Inserisci l’IBAN da usare per questa fattura',
                         prefixIcon: Icon(Icons.account_balance),
                       ),
                     ),
@@ -1775,6 +1776,22 @@ class _ListaFattureScreenState extends State<ListaFattureScreen> {
           : ListView(
               padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
               children: [
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: FilledButton.icon(
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const CreaFatturaScreen()),
+                      );
+                      _carica();
+                    },
+                    icon: const Icon(Icons.add_card_rounded),
+                    label: const Text('CREA NUOVA FATTURA'),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 TextField(
                   controller: _search,
                   decoration: const InputDecoration(prefixIcon: Icon(Icons.search), labelText: 'Cerca fattura o cliente'),
@@ -2073,6 +2090,7 @@ class _NuovoPreventivoScreenState extends State<NuovoPreventivoScreen> {
   final List<Map<String, dynamic>> acconti = [];
   double ivaPercent = 22;
   bool accettato = false;
+  bool pagato = false;
   bool busy = false;
 
   double get imponibile => articoli.fold<double>(
@@ -2309,7 +2327,7 @@ Future<void> aggiungiAcconto() async {
         0,
         (sum, a) => sum + ((a['importo'] as num?)?.toDouble() ?? 0),
       );
-      final pagato = totale - totaleAcconti <= 0.005;
+      final pagato = this.pagato || totale - totaleAcconti <= 0.005;
       // Non cancellare gli acconti: devono rimanere nello storico e nel PDF.
 
       await db.insertPreventivo(
@@ -2655,6 +2673,38 @@ Future<void> aggiungiAcconto() async {
                 controlAffinity: ListTileControlAffinity.leading,
               ),
             ),
+            const SizedBox(height: 8),
+            Card(
+              child: CheckboxListTile(
+                value: pagato,
+                onChanged: (v) => setState(() => pagato = v ?? false),
+                title: const Text(
+                  'Preventivo pagato',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: const Text(
+                  'Segna manualmente il preventivo come pagato. Se gli acconti coprono il totale, viene segnato automaticamente.',
+                ),
+                secondary: const Icon(Icons.paid_outlined),
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Card(
+              child: CheckboxListTile(
+                value: pagato,
+                onChanged: (v) => setState(() => pagato = v ?? false),
+                title: const Text(
+                  'Preventivo pagato',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: const Text(
+                  'Segna manualmente il preventivo come pagato. Se gli acconti coprono il totale, viene segnato automaticamente.',
+                ),
+                secondary: const Icon(Icons.paid_outlined),
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+            ),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
@@ -2812,6 +2862,11 @@ class _ListaPreventiviScreenState extends State<ListaPreventiviScreen> {
                 Icons.check_circle_outline,
                 'Stato',
                 (x['accettato'] as num?)?.toInt() == 1 ? 'ACCETTATO / RICEVUTA' : 'IN ATTESA',
+              ),
+              _detailRow(
+                Icons.paid_outlined,
+                'Pagamento',
+                (x['pagato'] as num?)?.toInt() == 1 ? 'PAGATO' : 'DA SALDARE',
               ),
               const SizedBox(height: 18),
               Row(
@@ -3067,6 +3122,17 @@ class _ListaPreventiviScreenState extends State<ListaPreventiviScreen> {
                                 fontSize: 16,
                               ),
                             ),
+                            const SizedBox(height: 3),
+                            Text(
+                              (x['pagato'] as num?)?.toInt() == 1 ? 'PAGATO' : 'DA SALDARE',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: (x['pagato'] as num?)?.toInt() == 1
+                                    ? Colors.green.shade700
+                                    : Colors.orange.shade800,
+                              ),
+                            ),
                             const SizedBox(height: 4),
                             Row(
                               mainAxisSize: MainAxisSize.min,
@@ -3128,6 +3194,7 @@ class _ModificaPreventivoScreenState
   late List<Map<String, dynamic>> acconti;
   late double ivaPercent;
   late bool accettato;
+  late bool pagato;
 
   bool busy = false;
 
@@ -3372,6 +3439,7 @@ Future<void> aggiungiAcconto() async {
     ivaPercent =
         (widget.preventivo['iva_percent'] as num?)?.toDouble() ?? 0;
     accettato = (widget.preventivo['accettato'] as num?)?.toInt() == 1;
+    pagato = (widget.preventivo['pagato'] as num?)?.toInt() == 1;
 
     try {
       final raw = jsonDecode(
@@ -3452,7 +3520,7 @@ Future<void> aggiungiAcconto() async {
         0,
         (sum, a) => sum + ((a['importo'] as num?)?.toDouble() ?? 0),
       );
-      final pagato = totale - totaleAcconti <= 0.005;
+      final pagato = this.pagato || totale - totaleAcconti <= 0.005;
       final updated = await db.updatePreventivo(
         id: preventivoId,
         cliente: cliente,
