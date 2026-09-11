@@ -1,0 +1,121 @@
+name: Build Gestione Preventivi Windows Installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  windows-installer:
+    name: Build Windows + Installer
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.3'
+          channel: stable
+          cache: true
+
+      - name: Enable Windows desktop
+        shell: pwsh
+        run: flutter config --enable-windows-desktop
+
+      - name: Generate Windows platform files
+        shell: pwsh
+        run: flutter create --platforms=windows --project-name preventivi_app .
+
+      - name: Get dependencies
+        shell: pwsh
+        run: flutter pub get
+
+      - name: Generate Windows application icon
+        shell: pwsh
+        run: dart run flutter_launcher_icons
+
+      - name: Read app version
+        shell: pwsh
+        run: |
+          $pubspec = Get-Content pubspec.yaml -Raw
+          if ($pubspec -match '(?m)^version:\s*([0-9]+\.[0-9]+\.[0-9]+)(?:\+([0-9]+))?\s*$') {
+            $version = $Matches[1]
+            $build = if ($Matches[2]) { $Matches[2] } else { '0' }
+            "APP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+            "APP_BUILD=$build" | Out-File -FilePath $env:GITHUB_ENV -Append
+            Write-Host "Versione app: $version+$build"
+          } else {
+            throw "Versione non trovata in pubspec.yaml"
+          }
+
+      - name: Analyze Flutter project
+        shell: pwsh
+        run: flutter analyze --no-fatal-infos
+
+      - name: Build Windows release
+        shell: pwsh
+        run: flutter build windows --release
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+
+      - name: Clean installer output
+        shell: pwsh
+        run: |
+          if (Test-Path installer/installer-output) {
+            Remove-Item installer/installer-output -Recurse -Force
+          }
+          New-Item -ItemType Directory -Path installer/installer-output -Force | Out-Null
+
+      - name: Build Gestione-Preventivi-Setup.exe
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            "/DMyAppVersion=$env:APP_VERSION" `
+            "/DMyAppBuild=$env:APP_BUILD" `
+            installer\Preventivi.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify installer
+        shell: pwsh
+        run: |
+          $installer = "installer/installer-output/Gestione-Preventivi-Setup.exe"
+          if (!(Test-Path $installer)) {
+            throw "Installer non trovato: $installer"
+          }
+          $size = (Get-Item $installer).Length
+          if ($size -lt 1000000) {
+            throw "Installer sospettosamente piccolo: $size bytes"
+          }
+          Write-Host "Installer creato: $installer ($size bytes)"
+
+      - name: Create portable ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path build/windows/x64/runner/Release/* `
+            -DestinationPath "Gestione-Preventivi-Windows-$env:APP_VERSION.zip" `
+            -Force
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gestione-Preventivi-Setup-${{ env.APP_VERSION }}
+          path: installer/installer-output/Gestione-Preventivi-Setup.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload portable Windows ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gestione-Preventivi-Windows-${{ env.APP_VERSION }}
+          path: Gestione-Preventivi-Windows-${{ env.APP_VERSION }}.zip
+          if-no-files-found: error
+          retention-days: 30
