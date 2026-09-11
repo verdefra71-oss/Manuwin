@@ -1,10 +1,8 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart' as p;
 import 'package:pdf/pdf.dart';
@@ -25,13 +23,10 @@ void main() async {
   if (Platform.isWindows) {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
-  } else {
-    await NotificationService.instance.initialize();
   }
+  await NotificationService.instance.initialize();
   await DatabaseHelper.instance.createAutomaticBackup();
-  if (!Platform.isWindows) {
-    await NotificationService.instance.refreshMonthlyReminder();
-  }
+  await NotificationService.instance.refreshMonthlyReminder();
   runApp(const PreventiviApp());
 }
 
@@ -103,6 +98,7 @@ class NotificationService {
   static const _notificationId = 7001;
 
   Future<void> initialize() async {
+    if (Platform.isWindows) return;
     tz.initializeTimeZones();
     tz.setLocalLocation(tz.getLocation('Europe/Rome'));
 
@@ -118,6 +114,7 @@ class NotificationService {
   }
 
   Future<bool> requestPermission() async {
+    if (Platform.isWindows) return true;
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
     final granted = await android?.requestNotificationsPermission();
@@ -125,11 +122,13 @@ class NotificationService {
   }
 
   Future<bool> isEnabled() async {
+    if (Platform.isWindows) return false;
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(_enabledKey) ?? false;
   }
 
   Future<void> setEnabled(bool enabled) async {
+    if (Platform.isWindows) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_enabledKey, enabled);
 
@@ -143,7 +142,7 @@ class NotificationService {
   }
 
   Future<void> refreshMonthlyReminder() async {
-    if (!await isEnabled()) return;
+    if (Platform.isWindows || !await isEnabled()) return;
 
     final saldi = await DatabaseHelper.instance.getPreventiviDaSaldare();
     await _plugin.cancel(_notificationId);
@@ -579,9 +578,7 @@ CREATE TABLE fatture (
       'pagato': pagato ? 1 : 0,
     });
     await autoBackup();
-    if (!Platform.isWindows) {
-      await NotificationService.instance.refreshMonthlyReminder();
-    }
+    await NotificationService.instance.refreshMonthlyReminder();
     return id;
   }
 
@@ -605,9 +602,7 @@ CREATE TABLE fatture (
       whereArgs: [id],
     );
     await autoBackup();
-    if (!Platform.isWindows) {
-      await NotificationService.instance.refreshMonthlyReminder();
-    }
+    await NotificationService.instance.refreshMonthlyReminder();
     return result;
   }
 
@@ -700,10 +695,18 @@ CREATE TABLE fatture (
       await txn.delete('prodotti');
       await txn.delete('clienti');
       await txn.delete('fatture');
-      for (final row in clienti) await txn.insert('clienti', row);
-      for (final row in prodotti) await txn.insert('prodotti', row);
-      for (final row in preventivi) await txn.insert('preventivi', row);
-      for (final row in fatture) await txn.insert('fatture', row);
+      for (final row in clienti) {
+        await txn.insert('clienti', row);
+      }
+      for (final row in prodotti) {
+        await txn.insert('prodotti', row);
+      }
+      for (final row in preventivi) {
+        await txn.insert('preventivi', row);
+      }
+      for (final row in fatture) {
+        await txn.insert('fatture', row);
+      }
     });
     await createAutomaticBackup();
   }
@@ -1507,7 +1510,7 @@ class _CreaFatturaScreenState extends State<CreaFatturaScreen> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: pagamento,
+                    initialValue: pagamento,
                     decoration: const InputDecoration(
                       labelText: 'Pagamento',
                       prefixIcon: Icon(Icons.account_balance_wallet_outlined),
@@ -1946,12 +1949,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   'Backup e dati',
                   () => apri(const BackupScreen()),
                 ),
-                if (!Platform.isWindows)
-                  _actionCard(
-                    Icons.notifications_active_rounded,
-                    'Notifiche',
-                    () => apri(const NotificheScreen()),
-                  ),
+                _actionCard(
+                  Icons.notifications_active_rounded,
+                  'Notifiche',
+                  () => apri(const NotificheScreen()),
+                ),
               ],
             ),
           ],
@@ -2465,7 +2467,7 @@ Future<void> aggiungiAcconto() async {
       final pagato = totale - totaleAcconti <= 0.005;
       // Non cancellare gli acconti: devono rimanere nello storico e nel PDF.
 
-      final id = await db.insertPreventivo(
+      await db.insertPreventivo(
         numero: numero,
         cliente: cliente,
         totale: totale,
