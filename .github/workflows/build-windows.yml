@@ -1,13 +1,17 @@
-name: Build Preventivi Windows
+name: Build Gestione Preventivi Windows
 
 on:
   workflow_dispatch:
   push:
-    branches: [ "main" ]
+    branches: [ main, master ]
+
+permissions:
+  contents: read
 
 jobs:
   build-windows:
     runs-on: windows-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -15,17 +19,11 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.35.3'
           channel: stable
           cache: true
 
-      - name: Enable Windows
-        shell: pwsh
-        run: flutter config --enable-windows-desktop
-
-      - name: Generate Windows platform files
-        shell: pwsh
-        run: flutter create --platforms=windows .
+      - name: Flutter doctor
+        run: flutter doctor -v
 
       - name: Get dependencies
         run: flutter pub get
@@ -36,16 +34,44 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos
 
-      - name: Build Windows release
+      - name: Build Windows Release
         run: flutter build windows --release
 
-      - name: Create portable ZIP
-        shell: pwsh
-        run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath Gestione-Preventivi-Windows.zip -Force
+      - name: Install Inno Setup
+        shell: powershell
+        run: choco install innosetup --yes --no-progress
 
-      - name: Upload Windows ZIP
+      - name: Build installer
+        shell: powershell
+        run: |
+          $iscc = "C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe"
+          if (-not (Test-Path $iscc)) { $iscc = "C:\\Program Files\\Inno Setup 6\\ISCC.exe" }
+          if (-not (Test-Path $iscc)) { throw "Inno Setup non trovato" }
+          & $iscc "installer\\Gestione-Preventivi.iss"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Package portable
+        shell: powershell
+        run: |
+          Compress-Archive -Path "build\\windows\\x64\\runner\\Release\\*" -DestinationPath "Gestione-Preventivi-Windows-Portable.zip" -Force
+
+      - name: Verify installer
+        shell: powershell
+        run: |
+          if (-not (Test-Path "build\\installer\\Gestione-Preventivi-Setup.exe")) {
+            throw "Gestione-Preventivi-Setup.exe non trovato"
+          }
+
+      - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: Gestione-Preventivi-Windows
-          path: Gestione-Preventivi-Windows.zip
+          name: Gestione-Preventivi-Setup
+          path: build/installer/Gestione-Preventivi-Setup.exe
+          if-no-files-found: error
+
+      - name: Upload portable
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gestione-Preventivi-Windows-Portable
+          path: Gestione-Preventivi-Windows-Portable.zip
           if-no-files-found: error
