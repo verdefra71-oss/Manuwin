@@ -1153,7 +1153,7 @@ class PdfGenerator {
                     ),
                   pw.SizedBox(height: 6),
                   pw.Text(
-                    'FATTURA',
+                    'Fattura pro-forma',
                     style: pw.TextStyle(
                       fontSize: 20,
                       fontWeight: pw.FontWeight.bold,
@@ -1167,6 +1167,11 @@ class PdfGenerator {
                 children: [
                   pw.Text('N. $numero', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
                   pw.Text('Data: $data'),
+                  pw.SizedBox(height: 4),
+                  pw.Text(
+                    'Marca da bollo assolta in originale',
+                    style: pw.TextStyle(fontSize: 9, fontStyle: pw.FontStyle.italic),
+                  ),
                 ],
               ),
             ],
@@ -2670,22 +2675,6 @@ Future<void> aggiungiAcconto() async {
                   'Se selezionato, il PDF verrà generato con la dicitura RICEVUTA.',
                 ),
                 secondary: const Icon(Icons.check_circle_outline),
-                controlAffinity: ListTileControlAffinity.leading,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Card(
-              child: CheckboxListTile(
-                value: pagato,
-                onChanged: (v) => setState(() => pagato = v ?? false),
-                title: const Text(
-                  'Preventivo pagato',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                subtitle: const Text(
-                  'Segna manualmente il preventivo come pagato. Se gli acconti coprono il totale, viene segnato automaticamente.',
-                ),
-                secondary: const Icon(Icons.paid_outlined),
                 controlAffinity: ListTileControlAffinity.leading,
               ),
             ),
