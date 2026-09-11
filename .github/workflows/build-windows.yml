@@ -25,6 +25,15 @@ jobs:
       - name: Flutter doctor
         run: flutter doctor -v
 
+      - name: Generate Windows desktop project
+        shell: powershell
+        run: |
+          # The source project may contain only partial Windows folders.
+          # Recreate the complete Flutter Windows runner before building.
+          if (Test-Path "windows") { Remove-Item "windows" -Recurse -Force }
+          flutter create --platforms=windows .
+          if (-not (Test-Path "windows/CMakeLists.txt")) { throw "Progetto Windows Flutter non generato" }
+
       - name: Get dependencies
         run: flutter pub get
 
