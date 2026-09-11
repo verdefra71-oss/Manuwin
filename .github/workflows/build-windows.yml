@@ -33,6 +33,11 @@ jobs:
           if (Test-Path "windows") { Remove-Item "windows" -Recurse -Force }
           flutter create --platforms=windows .
           if (-not (Test-Path "windows/CMakeLists.txt")) { throw "Progetto Windows Flutter non generato" }
+          # flutter create can generate a default test/widget_test.dart that
+          # references MyApp. This project uses PreventiviApp, and tests are
+          # not required for the Windows release build. Remove the generated
+          # test (and any stale test from the repository) before analyze.
+          if (Test-Path "test") { Remove-Item "test" -Recurse -Force }
 
       - name: Get dependencies
         run: flutter pub get
