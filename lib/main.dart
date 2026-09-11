@@ -611,6 +611,154 @@ CREATE TABLE fatture (
   }
 
 }
+
+Future<String?> selezionaCliente(BuildContext context) async {
+  final clienti = await DatabaseHelper.instance.getClienti();
+  if (!context.mounted) return null;
+  if (clienti.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Nessun cliente presente in archivio.')),
+    );
+    return null;
+  }
+
+  return showDialog<String>(
+    context: context,
+    builder: (dialogContext) {
+      String ricerca = '';
+      return StatefulBuilder(
+        builder: (context, setState) {
+          final filtrati = clienti.where((c) {
+            final nome = (c['nome'] ?? '').toString();
+            return nome.toLowerCase().contains(ricerca.toLowerCase());
+          }).toList();
+          return AlertDialog(
+            title: const Text('Seleziona cliente'),
+            content: SizedBox(
+              width: 520,
+              height: 420,
+              child: Column(
+                children: [
+                  TextField(
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Cerca cliente',
+                      prefixIcon: Icon(Icons.search),
+                    ),
+                    onChanged: (value) => setState(() => ricerca = value),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: filtrati.isEmpty
+                        ? const Center(child: Text('Nessun risultato'))
+                        : ListView.builder(
+                            itemCount: filtrati.length,
+                            itemBuilder: (_, index) {
+                              final cliente = filtrati[index];
+                              return ListTile(
+                                leading: const Icon(Icons.person_outline),
+                                title: Text((cliente['nome'] ?? '').toString()),
+                                subtitle: Text(
+                                  (cliente['indirizzo'] ?? '').toString(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                onTap: () => Navigator.pop(
+                                  dialogContext,
+                                  (cliente['nome'] ?? '').toString(),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Annulla'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
+
+Future<Map<String, dynamic>?> selezionaProdotto(BuildContext context) async {
+  final prodotti = await DatabaseHelper.instance.getProdotti();
+  if (!context.mounted) return null;
+  if (prodotti.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Nessun prodotto/servizio presente in archivio.')),
+    );
+    return null;
+  }
+
+  return showDialog<Map<String, dynamic>>(
+    context: context,
+    builder: (dialogContext) {
+      String ricerca = '';
+      return StatefulBuilder(
+        builder: (context, setState) {
+          final filtrati = prodotti.where((p) {
+            final nome = (p['nome'] ?? '').toString();
+            return nome.toLowerCase().contains(ricerca.toLowerCase());
+          }).toList();
+          return AlertDialog(
+            title: const Text('Seleziona prodotto / servizio'),
+            content: SizedBox(
+              width: 560,
+              height: 420,
+              child: Column(
+                children: [
+                  TextField(
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Cerca prodotto o servizio',
+                      prefixIcon: Icon(Icons.search),
+                    ),
+                    onChanged: (value) => setState(() => ricerca = value),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: filtrati.isEmpty
+                        ? const Center(child: Text('Nessun risultato'))
+                        : ListView.builder(
+                            itemCount: filtrati.length,
+                            itemBuilder: (_, index) {
+                              final prodotto = Map<String, dynamic>.from(filtrati[index]);
+                              final prezzo = (prodotto['prezzo'] as num?)?.toDouble() ?? 0;
+                              return ListTile(
+                                leading: const Icon(Icons.inventory_2_outlined),
+                                title: Text((prodotto['nome'] ?? '').toString()),
+                                trailing: Text(
+                                  '${prezzo.toStringAsFixed(2)} €',
+                                  style: const TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                                onTap: () => Navigator.pop(dialogContext, prodotto),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Annulla'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
+
 class PdfGenerator {
   static Future<void> generaECondividiPreventivo({
     required String numero,
